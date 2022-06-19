@@ -92,6 +92,8 @@ def build_regression_test(system, loader):
     # -- 
     # batch_loss = ...
     # convert batch_loss to list of floats
+    batch_is_correct = (preds == labels).numpy().astype(int).tolist()
+    batch_loss = sorted(F.cross_entropy(logits, labels, reduction='none').numpy().tolist(), reverse=True)[:100]
     # 
     # Type:
     # --
