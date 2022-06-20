@@ -10,6 +10,7 @@ import pandas as pd
 from os.path import join
 from pathlib import Path
 from pprint import pprint
+from torch import tensor, cat
 from torch.utils.data import DataLoader, TensorDataset
 
 from metaflow import FlowSpec, step, Parameter
@@ -127,6 +128,7 @@ class TrainIdentifyReview(FlowSpec):
     ])
 
     probs = np.zeros(len(X))  # we will fill this in
+    config = load_config(self.config_path)
 
     # https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html
     kf = KFold(n_splits=3)    # create kfold splits
@@ -152,6 +154,19 @@ class TrainIdentifyReview(FlowSpec):
       # as an input argument.
       # 
       # Our solution is ~15 lines of code.
+      train_X = tensor(X[train_index])
+      test_X = tensor(X[test_index])
+      train_Y = tensor(y[train_index])
+      test_Y = tensor(y[test_index])
+      train_dataset = TensorDataset(train_X, train_Y)
+      test_dataset = TensorDataset(test_X, test_Y)
+      train_dataloader = DataLoader(train_dataset, batch_size=config.train.optimizer.batch_size)
+      test_dataloader = DataLoader(test_dataset, batch_size=config.train.optimizer.batch_size)
+      sys = SentimentClassifierSystem(config)
+      trainer = Trainer(max_epochs = config.train.optimizer.max_epochs)
+      trainer.fit(sys, train_dataloader)
+      probs_ = cat(trainer.predict(sys, test_dataloader)).squeeze()
+      assert probs_.shape == (len(test_index),)
       # 
       # Pseudocode:
       # --
@@ -207,6 +222,10 @@ class TrainIdentifyReview(FlowSpec):
     # HINT: use cleanlab. See tutorial. 
     # 
     # Our solution is one function call.
+    ranked_label_issues = find_label_issues(
+      self.all_df.label, 
+      pred_probs=prob, 
+      return_indices_ranked_by='self_confidence')
     # 
     # Types
     # --
@@ -302,6 +321,9 @@ class TrainIdentifyReview(FlowSpec):
     # select the right indices. Since `all_df` contains the corrected labels,
     # training on it will incorporate cleanlab's re-annotations.
     # 
+    dm.train_dataset.data = self.all_df.iloc[:train_size]
+    dm.dev_dataset.data = self.all_df.iloc[train_size:train_size + dev_size]
+    dm.test_dataset.data = self.all_df.iloc[train_size + dev_size:]
     # Pseudocode:
     # --
     # dm.train_dataset.data = training slice of self.all_df
