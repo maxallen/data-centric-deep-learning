@@ -5,6 +5,7 @@ from os.path import join
 from torch.utils.data import Dataset
 from collections import defaultdict
 from src.paths import DATA_DIR
+from torchtext.data import get_tokenizer
 
 
 class ProductReviewEmbeddings(Dataset):
@@ -43,6 +44,10 @@ class ProductReviewEmbeddings(Dataset):
     #   split review into tokens
     #   update vocab with each token
     # 
+    tokenizer = get_tokenizer("basic_english")
+    for review in self.data.review:
+      for token in tokenizer(review):
+        vocab[token] += 1
     # Type:
     # --
     # vocab: dict[str, int]
@@ -106,6 +111,10 @@ class ProductReviewStream(Dataset):
     #   split review into tokens
     #   update vocab with each token
     # 
+    tokenizer = get_tokenizer("basic_english")
+    for review in self.data.review:
+      for token in tokenizer(review):
+        vocab[token] += 1
     # Type:
     # --
     # vocab: dict[str, int]
